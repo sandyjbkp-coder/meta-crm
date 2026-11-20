@@ -47,13 +47,11 @@ services:
       - key: DEMO_MODE
         value: "false"
 
-  - type: static_site
+  - type: web
     name: meta-crm-frontend
     runtime: static
-    plan: starter
-    region: oregon
     buildCommand: npm run build --workspace=client
-    publishDirectory: client/dist
+    staticPublishPath: ./client/dist
     envVars:
       - key: NODE_ENV
         value: production
