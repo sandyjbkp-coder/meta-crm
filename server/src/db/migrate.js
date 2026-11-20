@@ -63,12 +63,13 @@ export function migrate(repoRoot = process.cwd()) {
   console.log('[MIGR] Done');
 }
 
-export async function migratePg() {
+export async function migratePg(repoRoot = process.cwd()) {
   if (!isPostgres()) {
     console.log('[MIGR] Not in PostgreSQL mode. Set DATABASE_URL to run PostgreSQL migrations.');
     return;
   }
 
+  const { pgMigrationsDir } = getMigrationDirs(repoRoot);
   const db = getDb();
   
   if (!fs.existsSync(pgMigrationsDir)) {
