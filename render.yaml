@@ -31,28 +31,27 @@ services:
         value: ""
       - key: META_APP_SECRET
         value: ""
-      - key: META_PAGE_ACCESS_TOKEN
+      - key: [redacted]
         value: ""
-      - key: META_VERIFY_TOKEN
+      - key: [redacted]
         value: ""
       - key: META_PIXEL_ID
         value: ""
-      - key: META_TEST_EVENT_CODE
+      - key: [redacted]
         value: ""
-      - key: DEFAULT_ASSIGNEE_EMAIL
+      - key: [redacted]
         value: ""
-      - key: GRAPH_API_VERSION
+      - key: [redacted]
         value: "v19.0"
       - key: DEMO_MODE
         value: "false"
 
-  - type: web
+  - type: static-site
     name: meta-crm-frontend
-    runtime: static
     buildCommand: npm run build --workspace=client
-    staticPublishPath: ./client/dist
+    publishDirectory: ./client/dist
     envVars:
       - key: NODE_ENV
         value: production
-      - key: VITE_API_BASE_URL
+      - key: [redacted]
         value: https://meta-crm-api.onrender.com/api
