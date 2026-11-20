@@ -1,20 +1,23 @@
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import pg from 'pg';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const { Pool } = pg;
 
 let pgPool = null;
 let sqliteDb = null;
 let currentDialect = null; // 'sqlite' | 'postgres'
 
 export function getDb() {
-  if (!sqliteDb && !currentDialect) {
+  if (!pgPool && !sqliteDb && !currentDialect) {
     const databaseUrl = process.env.DATABASE_URL;
     
-    if (databaseUrl && databaseUrl.startsWith('postgres')) {
+    if (databaseUrl && (databaseUrl.startsWith('postgres://') || databaseUrl.startsWith('postgresql://'))) {
       return createPgConnection();
     } else {
       return _getOrCreateSqlite();
@@ -48,11 +51,14 @@ function _getOrCreateSqlite() {
 function createPgConnection() {
   if (pgPool) return createPgProxy();
   
-  const pgModule = require('pg'); // May fail if pg not installed
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('[DB] DATABASE_URL is required for PostgreSQL mode');
+  }
+  
   currentDialect = 'postgres';
   
-  const databaseUrl = process.env.DATABASE_URL;
-  pgPool = new pgModule.Pool({
+  pgPool = new Pool({
     connectionString: databaseUrl,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     max: 10,
@@ -71,30 +77,15 @@ function createPgConnection() {
 function createPgProxy() {
   return {
     prepare(sql) {
-      const pgSql = convertPlaceholders(sql);
-      return {
-        run(...params) {
-          throw new Error('[DB] Synchronous DB calls not supported in PostgreSQL mode. Use db.query() instead.');
-        },
-        get(...params) {
-          throw new Error('[DB] Synchronous DB calls not supported in PostgreSQL mode. Use db.query() instead.');
-        },
-        all(...params) {
-          throw new Error('[DB] Synchronous DB calls not supported in PostgreSQL mode. Use db.query() instead.');
-        },
-        iterate(...params) {
-          throw new Error('[DB] Synchronous DB calls not supported in PostgreSQL mode. Use db.query() instead.');
-        },
-      };
+      throw new Error('[DB] prepare() is not supported in PostgreSQL mode. Use db.query(sql, params) instead.');
     },
     exec(sql) {
-      throw new Error('[DB] Synchronous DB calls not supported in PostgreSQL mode. Use db.query() instead.');
+      throw new Error('[DB] exec() is not supported in PostgreSQL mode. Use db.query(sql, params) instead.');
     },
     async query(sql, params = []) {
       const client = await pgPool.connect();
       try {
-        const pgSql = convertPlaceholders(sql);
-        const result = await client.query(pgSql, params);
+        const result = await client.query(sql, params);
         return result;
       } finally {
         client.release();
@@ -109,11 +100,6 @@ function createPgProxy() {
   };
 }
 
-function convertPlaceholders(sql) {
-  let index = 0;
-  return sql.replace(/\?/g, () => `$${++index}`);
-}
-
 export function closeDb() {
   if (sqliteDb) {
     sqliteDb.close();
@@ -121,9 +107,12 @@ export function closeDb() {
     console.log('[DB] SQLite closed');
   }
   if (pgPool) {
-    pgPool.end();
+    pgPool.end().then(() => {
+      console.log('[DB] PostgreSQL pool closed');
+    }).catch((err) => {
+      console.error('[DB] Error closing PostgreSQL pool:', err.message);
+    });
     pgPool = null;
-    console.log('[DB] PostgreSQL pool closed');
   }
   currentDialect = null;
 }
@@ -144,6 +133,12 @@ export function isSqlite() {
 }
 
 export function initModels() {
+  // In PostgreSQL mode, schema is managed by migratePg() — do not initialize SQLite
+  if (isPostgres()) {
+    console.log('[DB] PostgreSQL mode: skipping SQLite initModels (schema managed by migratePg)');
+    return;
+  }
+  
   const database = _getOrCreateSqlite();
   
   database.exec(`
@@ -259,7 +254,7 @@ export function initModels() {
     CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
     CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
     CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
-    CREATE INDEX IF NOT EXISTS idx_leads_assIGNED_to ON leads(assigned_to);
+    CREATE INDEX IF NOT EXISTS idx_leads_assigned_to ON leads(assigned_to);
     CREATE INDEX IF NOT EXISTS idx_lead_notes_lead_id ON lead_notes(lead_id);
     CREATE INDEX IF NOT EXISTS idx_lead_activities_lead_id ON lead_activities(lead_id);
     CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
@@ -283,9 +278,5 @@ export function initModels() {
     CREATE INDEX IF NOT EXISTS idx_meta_oauth_states_used ON meta_oauth_states(used);
   `);
 
-  if (isPostgres()) {
-    console.log('[DB] Models initialized (PostgreSQL mode - migrations handle table creation)');
-  } else {
-    console.log('[DB] SQLite models initialized with indexes');
-  }
+  console.log('[DB] SQLite models initialized with indexes');
 }
