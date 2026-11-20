@@ -1,29 +1,18 @@
-# Render Blueprint for Meta Lead Ads CRM
-# Deploy this file to the root of your Git repository
-# Render will auto-detect and provision all services
+databases:
+  - name: meta-crm-db
+    plan: free
+    region: oregon
 
 services:
-  # PostgreSQL Managed Database
-  - type: postgres
-    name: meta-crm-db
-    plan: starter
-    region: us-east-1
-    ipAllowList: []
-    env:
-      - key: DATABASE_URL
-        value: postgres://user:pass@host:port/dbname
-    backup:
-      enabled: true
-      retentionDays: 7
-
-  # Backend Web Service (Node.js + Express)
   - type: web
     name: meta-crm-api
+    runtime: node
     plan: starter
-    region: us-east-1
-    env: node
+    region: oregon
     buildCommand: npm install
     startCommand: npm run start --workspace=server
+    healthCheckPath: /api/health
+    preDeployCommand: cd server && npm run migrate-pg
     envVars:
       - key: NODE_ENV
         value: production
@@ -37,6 +26,8 @@ services:
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
+      - key: CORS_ORIGIN
+        value: https://meta-crm-frontend.onrender.com
       - key: META_APP_ID
         value: ""
       - key: META_APP_SECRET
@@ -53,43 +44,18 @@ services:
         value: ""
       - key: GRAPH_API_VERSION
         value: "v19.0"
-      - key: CORS_ORIGIN
-        value: "https://meta-crm-frontend.onrender.com"
       - key: DEMO_MODE
         value: "false"
-      - key: INITIAL_ADMIN_EMAIL
-        value: ""
-      - key: INITIAL_ADMIN_PASSWORD
-        value: ""
-    healthCheckPath: /api/health
-    autoDeploy: false
 
-  # Frontend Static Site (React + Vite)
   - type: static_site
     name: meta-crm-frontend
+    runtime: static
     plan: starter
-    region: us-east-1
+    region: oregon
     buildCommand: npm run build --workspace=client
     publishDirectory: client/dist
     envVars:
       - key: NODE_ENV
         value: production
       - key: VITE_API_BASE_URL
-        value: "https://meta-crm-api.onrender.com/api"
-    headers:
-      - source: /*
-        headers:
-          - key: X-Content-Type-Options
-            value: nosniff
-          - key: X-Frame-Options
-            value: DENY
-          - key: X-XSS-Protection
-            value: "1; mode=block"
-          - key: Referrer-Policy
-            value: strict-origin-when-cross-origin
-          - key: Permissions-Policy
-            value: camera=(), microphone=(), geolocation=()
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://meta-crm-api.onrender.com/api/*
+        value: https://meta-crm-api.onrender.com/api
