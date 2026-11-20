@@ -10,9 +10,8 @@ services:
     plan: free
     region: oregon
     buildCommand: npm install
-    startCommand: npm run start --workspace=server
+    startCommand: npm run migrate-pg --workspace=server && npm run start --workspace=server
     healthCheckPath: /api/health
-    preDeployCommand: cd server && npm run migrate-pg
     envVars:
       - key: NODE_ENV
         value: production

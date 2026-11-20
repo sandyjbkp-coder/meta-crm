@@ -2,8 +2,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { getDb, getDialect, isPostgres, isSqlite } from './connection.js';
 
-const migrationsDir = path.join(process.cwd(), 'migrations');
-const pgMigrationsDir = path.join(process.cwd(), 'migrations-postgres');
+function getMigrationDirs(repoRoot = process.cwd()) {
+  return {
+    migrationsDir: path.join(repoRoot, 'migrations'),
+    pgMigrationsDir: path.join(repoRoot, 'migrations-postgres'),
+  };
+}
 
 function stripSqlitePragmas(sql) {
   return sql.replace(/^\s*PRAGMA\s+[^;]+;/gm, '').trim();
@@ -28,11 +32,9 @@ function convertSqliteToPostgres(sql) {
   return converted;
 }
 
-export function migrate() {
-  if (!fs.existsSync(migrationsDir)) {
-    console.log('[MIGR] No migrations directory at', migrationsDir);
-    return;
-  }
+export function migrate(repoRoot = process.cwd()) {
+  const { migrationsDir } = getMigrationDirs(repoRoot);
+  // ... rest of migrate function
 
   const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
   if (!files.length) {
@@ -82,6 +84,7 @@ export async function migratePg() {
 
   console.log('[MIGR] Running', files.length, 'PostgreSQL migrations...');
   
+  let fatalErrors = [];
   for (const f of files) {
     const sql = fs.readFileSync(path.join(pgMigrationsDir, f), 'utf-8');
     const statements = sql.split(';').filter(s => s.trim()).filter(s => !s.trim().startsWith('--'));
@@ -93,12 +96,20 @@ export async function migratePg() {
           await db.query(trimmed);
           console.log(`[MIGR] Applied ${f}: ${trimmed.substring(0, 60)}...`);
         } catch (err) {
+          // Genuine migration failures must cause non-zero exit
+          // Skip only truly idempotent errors (already exists)
           if (!err.message.includes('already exists') && !err.message.includes('duplicate')) {
-            console.error(`[MIGR] ${f}:`, err.message);
+            console.error(`[MIGR] FATAL ${f}:`, err.message);
+            fatalErrors.push({ file: f, error: err.message });
           }
         }
       }
     }
+  }
+  
+  if (fatalErrors.length > 0) {
+    console.error(`[MIGR] ${fatalErrors.length} migration(s) failed fatally`);
+    throw new Error(`Migration failures in ${fatalErrors.map(e => e.file).join(', ')}`);
   }
   
   console.log('[MIGR] PostgreSQL migrations complete');
