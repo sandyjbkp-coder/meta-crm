@@ -7,7 +7,7 @@ services:
   - type: web
     name: meta-crm-api
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     buildCommand: npm install
     startCommand: npm run start --workspace=server

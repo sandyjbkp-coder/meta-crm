@@ -1,0 +1,3 @@
+[ENV] Validation failed:
+  - DEFAULT_ASSIGNEE_EMAIL: Invalid email
+  - INITIAL_ADMIN_EMAIL: Invalid email
