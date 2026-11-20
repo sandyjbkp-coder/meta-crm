@@ -1,6 +1,6 @@
 -- Meta integration tables for PostgreSQL
 
-CREATE TABLE meta_integrations (
+CREATE TABLE IF NOT EXISTS meta_integrations (
   id SERIAL PRIMARY KEY,
   app_id TEXT NOT NULL,
   app_secret TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE meta_integrations (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE meta_pages (
+CREATE TABLE IF NOT EXISTS meta_pages (
   id SERIAL PRIMARY KEY,
   page_id TEXT NOT NULL,
   page_name TEXT NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE meta_pages (
   FOREIGN KEY (integration_id) REFERENCES meta_integrations(id) ON DELETE CASCADE
 );
 
-CREATE TABLE meta_lead_forms (
+CREATE TABLE IF NOT EXISTS meta_lead_forms (
   id SERIAL PRIMARY KEY,
   form_id TEXT NOT NULL,
   form_name TEXT,
@@ -44,7 +44,7 @@ CREATE TABLE meta_lead_forms (
   FOREIGN KEY (integration_id) REFERENCES meta_integrations(id) ON DELETE CASCADE
 );
 
-CREATE TABLE meta_webhook_events (
+CREATE TABLE IF NOT EXISTS meta_webhook_events (
   id SERIAL PRIMARY KEY,
   event_id TEXT NOT NULL,
   leadgen_id TEXT NOT NULL,
@@ -56,11 +56,11 @@ CREATE TABLE meta_webhook_events (
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX idx_meta_webhook_events_event_id ON meta_webhook_events(event_id);
-CREATE INDEX idx_meta_webhook_events_leadgen_id ON meta_webhook_events(leadgen_id);
-CREATE INDEX idx_meta_webhook_events_processed ON meta_webhook_events(processed);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_meta_webhook_events_event_id ON meta_webhook_events(event_id);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_events_leadgen_id ON meta_webhook_events(leadgen_id);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_events_processed ON meta_webhook_events(processed);
 
-CREATE TABLE meta_capi_events (
+CREATE TABLE IF NOT EXISTS meta_capi_events (
   id SERIAL PRIMARY KEY,
   event_id TEXT NOT NULL,
   integration_id INTEGER NOT NULL,
@@ -74,11 +74,11 @@ CREATE TABLE meta_capi_events (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_meta_capi_events_event_id ON meta_capi_events(event_id);
-CREATE INDEX idx_meta_capi_events_status ON meta_capi_events(delivery_status);
-CREATE INDEX idx_meta_capi_events_integration_id ON meta_capi_events(integration_id);
+CREATE INDEX IF NOT EXISTS idx_meta_capi_events_event_id ON meta_capi_events(event_id);
+CREATE INDEX IF NOT EXISTS idx_meta_capi_events_status ON meta_capi_events(delivery_status);
+CREATE INDEX IF NOT EXISTS idx_meta_capi_events_integration_id ON meta_capi_events(integration_id);
 
-CREATE TABLE meta_token_audit (
+CREATE TABLE IF NOT EXISTS meta_token_audit (
   id SERIAL PRIMARY KEY,
   integration_id INTEGER NOT NULL,
   action TEXT NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE meta_token_audit (
   FOREIGN KEY (integration_id) REFERENCES meta_integrations(id) ON DELETE CASCADE
 );
 
-CREATE TABLE meta_integration_logs (
+CREATE TABLE IF NOT EXISTS meta_integration_logs (
   id SERIAL PRIMARY KEY,
   integration_id INTEGER NOT NULL,
   level TEXT NOT NULL,
@@ -100,9 +100,7 @@ CREATE TABLE meta_integration_logs (
   FOREIGN KEY (integration_id) REFERENCES meta_integrations(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_meta_sync_jobs_status ON meta_sync_jobs(status);
-
-CREATE TABLE meta_sync_jobs (
+CREATE TABLE IF NOT EXISTS meta_sync_jobs (
   id SERIAL PRIMARY KEY,
   job_type TEXT NOT NULL,
   status TEXT NOT NULL,
@@ -111,8 +109,10 @@ CREATE TABLE meta_sync_jobs (
   error TEXT
 );
 
+CREATE INDEX IF NOT EXISTS idx_meta_sync_jobs_status ON meta_sync_jobs(status);
+
 -- Dead letter queue for failed CAPI events
-CREATE TABLE meta_capi_dead_letter (
+CREATE TABLE IF NOT EXISTS meta_capi_dead_letter (
   id SERIAL PRIMARY KEY,
   event_id TEXT NOT NULL,
   integration_id INTEGER NOT NULL,
@@ -125,11 +125,11 @@ CREATE TABLE meta_capi_dead_letter (
   FOREIGN KEY (integration_id) REFERENCES meta_integrations(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_meta_capi_dead_letter_event_id ON meta_capi_dead_letter(event_id);
-CREATE INDEX idx_meta_capi_dead_letter_created_at ON meta_capi_dead_letter(created_at);
+CREATE INDEX IF NOT EXISTS idx_meta_capi_dead_letter_event_id ON meta_capi_dead_letter(event_id);
+CREATE INDEX IF NOT EXISTS idx_meta_capi_dead_letter_created_at ON meta_capi_dead_letter(created_at);
 
 -- Webhook processing queue (PostgreSQL-backed, survives restarts)
-CREATE TABLE meta_webhook_queue (
+CREATE TABLE IF NOT EXISTS meta_webhook_queue (
   id SERIAL PRIMARY KEY,
   leadgen_id TEXT NOT NULL,
   form_id TEXT,
@@ -148,31 +148,7 @@ CREATE TABLE meta_webhook_queue (
   next_retry_at TIMESTAMP
 );
 
-CREATE UNIQUE INDEX idx_meta_webhook_queue_event_id ON meta_webhook_queue(event_id);
-CREATE INDEX idx_meta_webhook_queue_status ON meta_webhook_queue(status);
-CREATE INDEX idx_meta_webhook_queue_next_retry ON meta_webhook_queue(next_retry_at);
-CREATE INDEX idx_meta_webhook_queue_leadgen_id ON meta_webhook_queue(leadgen_id);
-
--- Token audit log
-CREATE TABLE meta_token_audit (
-  id SERIAL PRIMARY KEY,
-  integration_id INTEGER NOT NULL,
-  action TEXT NOT NULL,
-  status TEXT NOT NULL,
-  error TEXT,
-  expires_at TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (integration_id) REFERENCES meta_integrations(id) ON DELETE CASCADE
-);
-
--- Integration logs
-CREATE TABLE meta_integration_logs (
-  id SERIAL PRIMARY KEY,
-  integration_id INTEGER NOT NULL,
-  level TEXT NOT NULL,
-  component TEXT NOT NULL,
-  message TEXT NOT NULL,
-  details TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (integration_id) REFERENCES meta_integrations(id) ON DELETE CASCADE
-);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_meta_webhook_queue_event_id ON meta_webhook_queue(event_id);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_queue_status ON meta_webhook_queue(status);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_queue_next_retry ON meta_webhook_queue(next_retry_at);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_queue_leadgen_id ON meta_webhook_queue(leadgen_id);
