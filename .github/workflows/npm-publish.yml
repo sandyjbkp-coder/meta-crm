@@ -10,8 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    permissions:
+    runs-on: ubuntu-latesuª    permissions:
       contents: read
       packages: write
 
@@ -30,8 +29,8 @@ jobs:
         run: |
           ls -la package-lock.json server/package-lock.json client/package-lock.json
 
-      - name: Install dependencies (root)
-        run: npm ci --verbose
+      - name: Install dependencies (root) - regenerate lockfile
+        run: npm install --verbose
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
