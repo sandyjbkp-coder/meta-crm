@@ -10,7 +10,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latesuª    permissions:
+    runs-on: ubuntu-latest
+    permissions:
       contents: read
       packages: write
 
@@ -25,9 +26,8 @@ jobs:
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Verify lockfiles
-        run: |
-          ls -la package-lock.json server/package-lock.json client/package-lock.json
+      - name: Verify lockfiles exist
+        run: ls -la package-lock.json server/package-lock.json client/package-lock.json
 
       - name: Install dependencies (root) - regenerate lockfile
         run: npm install --verbose
