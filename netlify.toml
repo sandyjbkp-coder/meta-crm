@@ -1,5 +1,5 @@
 [build]
-  command = "npm install --workspaces --include-workspace-root && npm run build --workspace=client"
+  command = "npm install --workspaces --include-workspace-root --include=dev && npm run build --workspace=client"
   publish = "client/dist"
 
 [functions]

@@ -1,10 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DragDropContext, Droppable, Draggable } from '@dnd-kit/core';
+import { DndContext, useDroppable, useDraggable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { GripVertical } from 'lucide-react';
 import api from '../lib/api';
 
 const STATUSES = ['new', 'contacted', 'qualified', 'proposal', 'won', 'lost'];
+
+function Column({ status, leads }) {
+  const { setNodeRef } = useDroppable({ id: status });
+
+  return (
+    <div className="w-64 flex-shrink-0">
+      <h3 className="font-semibold text-lg mb-2 capitalize border-b pb-2">
+        {status} ({leads?.length || 0})
+      </h3>
+      <div
+        ref={setNodeRef}
+        className="bg-gray-50 rounded-lg p-3 min-h-[200px] border-2 border-dashed border-gray-200"
+      >
+        {leads?.length === 0 ? (
+          <p className="text-gray-400 text-center mt-8">Drop here</p>
+        ) : (
+          leads?.map(lead => <LeadCard key={lead.id} lead={lead} />)
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LeadCard({ lead }) {
+  const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="bg-white border rounded-lg p-3 mb-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="font-medium text-sm truncate max-w-[150px]">{lead.full_name}</h4>
+        <GripVertical size={16} className="text-gray-400 cursor-grab" {...attributes} {...listeners} />
+      </div>
+      <p className="text-xs text-gray-600 truncate mb-1">{lead.email}</p>
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-gray-500">{lead.phone}</span>
+        <span className="text-xs text-gray-400">
+          {lead.assigned_to_name || `ID: ${lead.id}`}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function Pipeline() {
   const { data: leads = [], isLoading } = useQuery({
@@ -15,7 +60,9 @@ export default function Pipeline() {
     },
   });
 
-  const [pipelineLeads, setPipelineLeads] = useState({});n
+  const [pipelineLeads, setPipelineLeads] = useState({});
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useEffect(() => {
     const grouped = {};
@@ -34,9 +81,17 @@ export default function Pipeline() {
     const sourceStatus = Object.keys(pipelineLeads).find(
       status => pipelineLeads[status].some(lead => lead.id === active.id)
     );
-    const destStatus = over.id;
 
-    if (sourceStatus === destStatus) return;
+    let destStatus;
+    if (STATUSES.includes(over.id)) {
+      destStatus = over.id;
+    } else {
+      destStatus = Object.keys(pipelineLeads).find(
+        status => pipelineLeads[status].some(lead => lead.id === over.id)
+      );
+    }
+
+    if (!sourceStatus || !destStatus || sourceStatus === destStatus) return;
 
     try {
       await api.patch(`/leads/${active.id}`, { status: destStatus });
@@ -61,55 +116,13 @@ export default function Pipeline() {
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Pipeline</h1>
       <div className="overflow-x-auto">
-        <DragDropContext onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 min-w-max">
             {STATUSES.map(status => (
-              <div key={status} className="w-64 flex-shrink-0">
-                <h3 className="font-semibold text-lg mb-2 capitalize border-b pb-2">
-                  {status} ({pipelineLeads[status]?.length || 0})
-                </h3>
-                <Droppable droppableId={status}>
-                  {(provided) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className="bg-gray-50 rounded-lg p-3 min-h-[200px] border-2 border-dashed border-gray-200"
-                    >
-                      {pipelineLeads[status]?.length === 0 ? (
-                        <p className="text-gray-400 text-center mt-8">Drop here</p>
-                      ) : (
-                        pipelineLeads[status]?.map((lead, index) => (
-                          <Draggable key={lead.id} draggableId={lead.id.toString()} index={index}>
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className="bg-white border rounded-lg p-3 mb-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-medium text-sm truncate max-w-[150px]">{lead.full_name}</h4>
-                                  <GripVertical size={16} className="text-gray-400" {...provided.dragHandleProps} />
-                                </div>
-                                <p className="text-xs text-gray-600 truncate mb-1">{lead.email}</p>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-500">{lead.phone}</span>
-                                  <span className="text-xs text-gray-400">
-                                    {lead.assigned_to_name || `ID: ${lead.id}`}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))
-                      )}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </div>
+              <Column key={status} status={status} leads={pipelineLeads[status]} />
             ))}
           </div>
-        </DragDropContext>
+        </DndContext>
       </div>
     </div>
   );
