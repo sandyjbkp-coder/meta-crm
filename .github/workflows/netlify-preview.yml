@@ -1,0 +1,75 @@
+name: Netlify Preview
+
+on:
+  push:
+    branches:
+      - feature/netlify-migration
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Fetch full history for deploy preview
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm install --workspaces --include-workspace-root --verbose
+
+      - name: Build client
+        run: npm run build --workspace=client
+
+      - name: Build server
+        run: npm run build --workspace=server
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            client/dist
+            server/dist
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (again for deploy)
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm install --workspaces --include-workspace-root --verbose
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: ./build-output
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v2.0
+        with:
+          publish-dir: ./build-output
+          production: false  # preview only
+          token: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          netlify-site-id: ${{ secrets.NETLIFY_SITE_ID }}
