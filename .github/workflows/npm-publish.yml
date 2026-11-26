@@ -22,32 +22,20 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Verify lockfiles exist
         run: ls -la package-lock.json server/package-lock.json client/package-lock.json
 
-      - name: Install dependencies (root) - regenerate lockfile
-        run: npm install --verbose
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies (server)
-        run: npm ci --verbose
-        working-directory: server
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies (client)
-        run: npm ci --verbose
-        working-directory: client
+      - name: Install dependencies (root + workspaces)
+        run: npm install --workspaces --include-workspace-root --verbose
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
-        run: npm run test --workspaces 2>/dev/null || echo "No test scripts configured"
+        run: npm run test --workspaces
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -55,6 +43,7 @@ jobs:
         run: npm run build
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
